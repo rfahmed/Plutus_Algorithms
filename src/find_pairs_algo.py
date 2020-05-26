@@ -81,9 +81,8 @@ def corrolationValsandHeatmap(instrumentIds):
     pricearr = []
     for i in instrumentIds:
         print(i)
-        time.sleep(0.3)
-        dftemp = tda.histdata(Symbol='{}'.format(i), periodType='year', frequencyType='daily', frequency='1', endDate='1577854800000',
-             startDate='1274328000000', needExtendedHoursData='false')
+        time.sleep(0.3) #we do this so that we don't throw an error with the api call limit
+        dftemp = closedata(i)
         pricearr.append(dftemp)
     print(tda.toremove)
     dsfinal = pd.concat(pricearr, axis=1)
@@ -110,3 +109,4 @@ def readCSVdata(path):
     csvdata = pd.DataFrame(pd.read_csv(path, engine='python'))
     csvdata = csvdata.iloc[:,0]
     corrolationValsandHeatmap(instrumentIds=csvdata)
+
