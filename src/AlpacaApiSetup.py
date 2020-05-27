@@ -1,4 +1,5 @@
 import alpaca_trade_api as tradeapi
+import pandas as pd
 from config import alpaca_key, alpaca_secret, alpaca_base_url
 
 # authentication and connection details
@@ -9,21 +10,72 @@ base_url = alpaca_base_url
 api = tradeapi.REST(api_key, api_secret, base_url, api_version='v2')
 # obtain account information
 account = api.get_account()
-currentOrders = []  # this is to store current order IDs, when you buy, sell, close position, etc. update this list
-# buy function:
-    # should be easy to find in alpaca documentation under orders
 
-# sell function:
-    # should be easy to find in alpaca documentation under orders
 
-# get position info function
-    # should be easy to find in alpaca docs under positions
+# buy
+def buy(symbol, qty):
+    api.submit_order(
+        symbol=symbol,
+        qty=qty,
+        side='buy',
+        type='market',
+    )
 
-# cancel all orders function
-    # this is under alpaca documentation under orders
 
-# general liquidation function (close all positions)
-    # exists in alpaca documentation under positions
+# sell
+def sell(symbol, qty):
+    api.submit_order(
+        symbol=symbol,
+        qty=qty,
+        side='sell',
+        type='market',
+    )
 
-# display all current positions function
-    # also exists in positions portion of documentation
+
+# check if market is open
+def is_market_open():
+    clock = api.get_clock()
+    return clock.is_open
+    # TODO: return boolean based on if it is open on the hour.
+
+
+# get position info (symbol, quantity, market value, side, change today)
+def display_position_info():
+    portfolio = api.list_positions()
+    sym = []
+    qty = []
+    mv = []
+    side = []
+    change = []
+    for position in portfolio:
+        sym.append(position.symbol)
+        qty.append(position.qty)
+        mv.append(position.market_value)
+        side.append(position.side)
+        change.append(position.change_today)
+    data = {'Symbol': sym,
+            'Quantity': qty,
+            'Market Value': mv,
+            'Side': side,
+            '∆ Today': change}
+    df = pd.DataFrame(data)
+    print(df)
+
+
+# get open positions
+def get_open_positions():
+    api.list_positions()
+
+
+# cancel all orders:
+def cancel_all_orders():
+    list = api.list_orders()
+    print(' '.join(list))
+    api.cancel_all_orders()
+
+
+# close all positions
+def close_all_positions():
+    list = api.list_positions()
+    print(' '.join(list))
+    api.close_all_positions()
