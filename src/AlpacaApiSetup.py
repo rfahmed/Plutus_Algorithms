@@ -11,7 +11,6 @@ api = tradeapi.REST(api_key, api_secret, base_url, api_version='v2')
 # obtain account information
 account = api.get_account()
 
-
 # buy
 def buy(symbol, qty):
     api.submit_order(
