@@ -1,19 +1,17 @@
 # some functions to convert TDA data to a usable format for algo design
-import json
-import time
-import urllib
 
+import urllib
 import requests
 import dateutil.parser
 from datetime import datetime
 import datetime
-
-import websockets
 from selenium import webdriver
 import config
 from selenium.webdriver.common.keys import Keys
 import pandas as pd
 from selenium.webdriver.chrome.options import Options
+import json
+from websocket import create_connection
 
 toremove = []
 
@@ -45,6 +43,17 @@ def histdata(Symbol, periodType, frequencyType, frequency, endDate, startDate, n
     if len(df.index) < 251:
         toremove.append(Symbol)
     return df
+
+
+def marketOpen(Market):
+    endpoint = r"https://api.tdameritrade.com/v1/marketdata/{}/hours".format(Market)
+    headers = {'Authorization': 'Bearer {}'.format(accesstoken())}
+    # define params for endpoint
+    params = {'date': str(datetime.datetime.today()).split()[0]}
+    # make a request
+    time_info = requests.get(url=endpoint, params=params, headers=headers)
+    time_to_json = time_info.json()
+    return (time_to_json['equity']['equity']['isOpen'])
 
 
 def histdatahourly(Symbol, periodType, frequencyType, frequency, period, needExtendedHoursData):
@@ -90,7 +99,7 @@ def accesstoken():
     driver.find_element_by_id('username').send_keys(payload['username'])
     driver.find_element_by_id('password').send_keys(payload['password'])
     driver.find_element_by_id('accept').click()
-    print('Logged in successfully...')
+    # print('Logged in successfully...')
     driver.find_element_by_xpath('//*[@id="authform"]/main/details/summary').send_keys('\ue006')
     driver.find_element_by_name('init_secretquestion').send_keys(Keys.RETURN)
     secq = driver.find_element_by_xpath('//*[@id="authform"]/main/div[2]/p[2]').text
@@ -104,12 +113,12 @@ def accesstoken():
         ans = config.tda_Grandma
     driver.find_element_by_name('su_secretquestion').send_keys(ans)
     driver.find_element_by_id('accept').send_keys(Keys.RETURN)
-    print('Answered security question...')
+    # print('Answered security question...')
     driver.find_element_by_id('accept').send_keys(Keys.RETURN)
     url = driver.current_url
     parsed_url = urllib.parse.unquote(url.split('code=')[1])
     driver.quit()
-    print('Got access token...')
+    # print('Got access token...')
     url_auth = r"https://api.tdameritrade.com/v1/oauth2/token"
     headers = {'Content-Type': "application/x-www-form-urlencoded"}
     payload = {'grant_type': 'authorization_code',
@@ -120,18 +129,34 @@ def accesstoken():
     auth_reply = requests.post(url_auth, headers=headers, data=payload)
     decoded = auth_reply.json()
     token = decoded['access_token']
-    print('Successfully formatted access token...')
-    print('Transferring to relevant endpoint now...')
+    # print('Successfully formatted access token...')
+    # print('Transferring to relevant endpoint now...')
     return token
+
+
+# #tried to make access tokens last longer
+# access_token = 'nothing here'
+# counter = 0
+# def refreshtoken():
+#     global access_token
+#     global counter
+#     counter += 1
+#     if counter %5==0:
+#         access_token = accesstoken()
+#         print(access_token)
+#     else:
+#         print(counter)
+#         print(access_token)
+#         pass
 
 
 # Quote Endpoint:
 def quote(symbol):
     token = accesstoken()
     quote_url = "https://api.tdameritrade.com/v1/marketdata/{}/quotes".format(symbol)
-    payload = {'apikey': config.client_id,
-               'Authorization': token}
-    quote_reply = requests.get(quote_url, params=payload)
+    headers = {'Authorization': 'Bearer {}'.format(accesstoken())}
+    payload = {'apikey': config.client_id}
+    quote_reply = requests.get(quote_url, headers=headers, data=payload)
     quotes = quote_reply.json()
     quote_json = json.dumps(quotes)
     pandas_json_quote = pd.read_json(quote_json)
@@ -142,57 +167,64 @@ def quote(symbol):
     return lastprice
 
 
+# next two are for websocket attempt (ended up not needing it though)
 def unix_time_millis(dt):
     epoch = datetime.datetime.utcfromtimestamp(0)
     return (dt - epoch).total_seconds() * 1000.0
 
 
-# need to access user info and preferances > get user principles endpoint
-#def websocket():
-access_token = accesstoken()
-print('tjos o')
-# define our endpoint
-endpoint = 'https://api.tdameritrade.com/v1/userprincipals'
-headers = {'Authorization': 'Bearer {}'.format(access_token)}
-# define params for endpoint
-params = {'fields': 'streamerSubscriptionKeys,streamerConnectionInfo'}
-# make a request
-stream_info = requests.get(url=endpoint, params=params, headers=headers)
-stream_info_response = stream_info.json()
-# define info we need
-tokenTimeStamp = stream_info_response['streamerInfo']['tokenTimestamp']
-date = dateutil.parser.parse(tokenTimeStamp, ignoretz=True)
-tokenTimeStampAsMs = unix_time_millis(date)
-credentials = {'userid': stream_info_response['accounts'][0]['accountId'],
-               'token': stream_info_response['streamerInfo']['token'],
-               'company': stream_info_response['accounts'][0]['company'],
-               'segments': stream_info_response['accounts'][0]['segment'],
-               'cddomain': stream_info_response['accounts'][0]['accountCdDomainId'],
-               'usergroup': stream_info_response['streamerInfo']['userGroup'],
-               'accesslevel': stream_info_response['streamerInfo']['accessLevel'],
-               'authorized': "Y",
-               'timestamp': int(tokenTimeStampAsMs),
-               'appid': stream_info_response['streamerInfo']['appId'],
-               'acl': stream_info_response['streamerInfo']['acl']}
-login_request = {"requests": [{
-    "service": "ADMIN",
-    "command": "LOGIN",
-    "requestid": "1",
-    "account": stream_info_response['accounts'][0]['accountId'],
-    "source": stream_info_response['streamerInfo']['appId'],
-    "parameters": {"credential": urllib.parse.urlencode(credentials),
-                   "token": stream_info_response['streamerInfo']['token'],
-                   "version": "1.0"}}]}
-data_request = {"requests": [{
-    "service": "QUOTE",
-    "requestid": "2",
-    "command": "SUBS",
-    "account": "your_account",
-    "source": "your_source_id",
-    "parameters": {
-        "keys": "AAPL,MSFT",
-        "fields": "0,1,2,3,4,5,6,7,8"
-    }}]}
-login_encoded = json.dumps(login_request)
-data_encoded = json.dumps(data_request)
-uri = "wss://" + stream_info_response ['streamerInfo']['streamerSocketUrl'] + "/ws"
+def getlogininfo():
+    # need to access user info and preferances > get user principles endpoint
+    access_token = accesstoken()
+    # define our endpoint
+    endpoint = 'https://api.tdameritrade.com/v1/userprincipals'
+    headers = {'Authorization': 'Bearer {}'.format(access_token)}
+    # define params for endpoint
+    params = {'fields': 'streamerSubscriptionKeys,streamerConnectionInfo'}
+    # make a request
+    stream_info = requests.get(url=endpoint, params=params, headers=headers)
+    stream_info_response = stream_info.json()
+    # define info we need
+    tokenTimeStamp = stream_info_response['streamerInfo']['tokenTimestamp']
+    date = dateutil.parser.parse(tokenTimeStamp, ignoretz=True)
+    tokenTimeStampAsMs = unix_time_millis(date)
+    credentials = {'userid': stream_info_response['accounts'][0]['accountId'],
+                   'token': stream_info_response['streamerInfo']['token'],
+                   'company': stream_info_response['accounts'][0]['company'],
+                   'segments': stream_info_response['accounts'][0]['segment'],
+                   'cddomain': stream_info_response['accounts'][0]['accountCdDomainId'],
+                   'usergroup': stream_info_response['streamerInfo']['userGroup'],
+                   'accesslevel': stream_info_response['streamerInfo']['accessLevel'],
+                   'authorized': "Y",
+                   'timestamp': int(tokenTimeStampAsMs),
+                   'appid': stream_info_response['streamerInfo']['appId'],
+                   'acl': stream_info_response['streamerInfo']['acl']}
+    from urllib.parse import urlparse
+    login_request = {"requests": [{
+        "service": "ADMIN",
+        "requestid": "1",
+        "command": "LOGIN",
+        "account": stream_info_response['accounts'][0]['accountId'],
+        "source": stream_info_response['streamerInfo']['appId'],
+        "parameters": {"token": stream_info_response['streamerInfo']['token'],
+                       "version": "1.0",
+                       "credential": urllib.parse.urlencode(credentials)}}]}
+    data_request = {"requests": [{
+        "service": "QUOTE",
+        "requestid": "1",
+        "command": "SUBS",
+        "account": stream_info_response['accounts'][0]['accountId'],
+        "source": access_token,
+        "parameters": {
+            "keys": "AAPL,MSFT",
+            "fields": "0,1,2,3,4,5,6,7,8"
+        }}]}
+    login_encoded = json.dumps(login_request)
+    data_encoded = json.dumps(data_request)
+    uri = "wss://" + stream_info_response['streamerInfo']['streamerSocketUrl'] + "/ws"
+    ws = create_connection(uri)
+    ws.send(login_encoded)
+    ws.send(data_encoded)
+    result = ws.recv()
+    print(result)
+    ws.close()
