@@ -10,9 +10,9 @@ import AlpacaApiSetup as alpaca
 # set up constant graph of z score
 
 S1='MSFT'
-S2='TSLA'
+S2='AAPL'
 # TODO: repeat buys need to be eliminated
-# TODO:
+last_zscore = None
 import threading
 def timer():
   t = threading.Timer(60, timer)
@@ -23,13 +23,13 @@ def timer():
 def run_every_halfhour(t):
     market_open = analysis.marketOpen('EQUITY')
     if market_open==True:
-    clk_id1 = time.CLOCK_REALTIME
-    epoch_time = time.clock_gettime(clk_id1)
-    human_time = datetime.datetime.fromtimestamp(epoch_time).strftime('%c')
-    if int(human_time[14: 16]) == (30):
-        zscores(S1, S2)
-    elif int(human_time[14: 16]) == (00):
-        zscores(S1, S2)
+        clk_id1 = time.CLOCK_REALTIME
+        epoch_time = time.clock_gettime(clk_id1)
+        human_time = datetime.datetime.fromtimestamp(epoch_time).strftime('%c')
+        if int(human_time[14: 16]) == (30):
+            zscores(S1, S2)
+        elif int(human_time[14: 16]) == (00):
+            zscores(S1, S2)
 
 def zscores(S1, S2):
     S1list = analysis.hourlyhistoricals(S1)
@@ -54,8 +54,42 @@ def zscores(S1, S2):
     return zscore
 def checkbuysell (zscore):
     print('updated z score chart')
-    print(zscore.iloc[len(zscore)-1])
+    zscore = zscore["Price"].tolist()
+    current_zscore = zscore[len(zscore)-1]
+    global last_zscore
+    if current_zscore >1.0 and last_zscore >1.0:
+        pass
+    if current_zscore<-1.0 and last_zscore<-1.0:
+        pass
+    if current_zscore<0.5 and current_zscore>-0.5:
+        pass
+    last_zscore=current_zscore
+    if current_zscore>1.0:
+        # we sell the ratio here:
+        # When selling the ratio, sell S1 and buy S2
+        # buy S2:
+        alpaca.buy(S2, qty= 10)
+        # sell S1:
+        open_pos = alpaca.get_open_positions()
+        for i in open_pos:
+            if i==S2:
+                alpaca.close_a_position(S1)
+        alpaca.sell(S1, qty=10)
+    if current_zscore<1.0:
+        # we buy the ratio here:
+        # When buying the ratio, buy S1 and sell S2
+        # buy S1:
+        alpaca.buy(S1, qty= 10)
+        # sell S2:
+        open_pos = alpaca.get_open_positions()
+        for i in open_pos:
+            if i==S1:
+                alpaca.close_a_position(S2)
+        alpaca.sell(S2, qty=10)
+    if (current_zscore > -0.5 and current_zscore <0.5):
+        # here we liquidate
+        alpaca.close_all_positions()
+# first we must buy an initial amount of each:
 
+# now we can do the 30 min intervals:
 timer()
-#run_every_halfhour()
-# buy sell signals

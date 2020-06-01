@@ -18,6 +18,7 @@ def buy(symbol, qty):
         qty=qty,
         side='buy',
         type='market',
+        time_in_force='day'
     )
 
 
@@ -28,6 +29,7 @@ def sell(symbol, qty):
         qty=qty,
         side='sell',
         type='market',
+        time_in_force='day'
     )
 
 
@@ -63,18 +65,24 @@ def display_position_info():
 
 # get open positions
 def get_open_positions():
-    api.list_positions()
+    return api.list_positions()
 
 
 # cancel all orders:
 def cancel_all_orders():
-    list = api.list_orders()
-    print(' '.join(list))
+    # list = api.list_orders()
+    # print(' '.join(list))
     api.cancel_all_orders()
+
+# close a position
+def close_a_position(Symbol):
+    api.close_position(symbol=Symbol)
 
 
 # close all positions
 def close_all_positions():
-    list = api.list_positions()
-    print(' '.join(list))
+    # list = api.list_positions()
+    # print(' '.join(list))
     api.close_all_positions()
+
+cancel_all_orders()
