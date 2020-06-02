@@ -9,8 +9,8 @@ import AlpacaApiSetup as alpaca
 # set up websocket to constantly import data
 # set up constant graph of z score
 
-S1='MSFT'
-S2='AAPL'
+S1='GIS'
+S2='KHC'
 # TODO: repeat buys need to be eliminated
 last_zscore = None
 import threading
@@ -21,14 +21,16 @@ def timer():
 
 
 def run_every_halfhour(t):
-    market_open = analysis.marketOpen('EQUITY')
+    market_open = alpaca.is_market_open()
     if market_open==True:
         clk_id1 = time.CLOCK_REALTIME
         epoch_time = time.clock_gettime(clk_id1)
         human_time = datetime.datetime.fromtimestamp(epoch_time).strftime('%c')
         if int(human_time[14: 16]) == (30):
+            print('EXECUTED AT: ', human_time)
             zscores(S1, S2)
         elif int(human_time[14: 16]) == (00):
+            print('EXECUTED AT: ', human_time)
             zscores(S1, S2)
 
 def zscores(S1, S2):
@@ -53,19 +55,23 @@ def zscores(S1, S2):
     checkbuysell(zscore)
     return zscore
 def checkbuysell (zscore):
-    print('updated z score chart')
     zscore = zscore["Price"].tolist()
     current_zscore = zscore[len(zscore)-1]
-    global last_zscore
-    if current_zscore >1.0 and last_zscore >1.0:
-        pass
-    if current_zscore<-1.0 and last_zscore<-1.0:
-        pass
-    if current_zscore<0.5 and current_zscore>-0.5:
-        pass
-    last_zscore=current_zscore
+    # global last_zscore
+    # if current_zscore >1.0 and last_zscore >1.0:
+    #     print('Passed over to prevent double buying')
+    #     pass
+    # if current_zscore<-1.0 and last_zscore<-1.0:
+    #     print('Passed over to prevent double buying')
+    #     pass
+    # if current_zscore<0.5 and current_zscore>-0.5:
+    #     print('Passed over to prevent double buying')
+    #     pass
+    # last_zscore=current_zscore
+    print(current_zscore)
     if current_zscore>1.0:
         # we sell the ratio here:
+        print('EXECUTING: Selling the ratio...')
         # When selling the ratio, sell S1 and buy S2
         # buy S2:
         alpaca.buy(S2, qty= 10)
@@ -75,8 +81,9 @@ def checkbuysell (zscore):
             if i==S2:
                 alpaca.close_a_position(S1)
         alpaca.sell(S1, qty=10)
-    if current_zscore<1.0:
+    if current_zscore<-1.0:
         # we buy the ratio here:
+        print('EXECUTING: Buying the ratio...')
         # When buying the ratio, buy S1 and sell S2
         # buy S1:
         alpaca.buy(S1, qty= 10)
@@ -88,6 +95,7 @@ def checkbuysell (zscore):
         alpaca.sell(S2, qty=10)
     if (current_zscore > -0.5 and current_zscore <0.5):
         # here we liquidate
+        print('liquidating')
         alpaca.close_all_positions()
 # first we must buy an initial amount of each:
 

@@ -160,10 +160,11 @@ def quote(symbol):
     quotes = quote_reply.json()
     quote_json = json.dumps(quotes)
     pandas_json_quote = pd.read_json(quote_json)
+    #print(quote_json)
     pandas_current_quote = pd.DataFrame(pandas_json_quote)
     lastprice = pandas_current_quote.loc['lastPrice']
     lastprice = lastprice.iloc[0]
-    print('the most recent quote for {} is: '.format(symbol), lastprice)
+    #print('the most recent quote for {} is: '.format(symbol), lastprice)
     return lastprice
 
 

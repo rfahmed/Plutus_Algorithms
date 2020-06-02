@@ -85,4 +85,3 @@ def close_all_positions():
     # print(' '.join(list))
     api.close_all_positions()
 
-cancel_all_orders()
